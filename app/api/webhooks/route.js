@@ -2,7 +2,9 @@ import { verifyWebhook } from '@clerk/nextjs/webhooks';
 
 export async function POST(req) {
   try {
-    const evt = await verifyWebhook(req);
+    const evt = await verifyWebhook(req, {
+      secret: process.env.CLERK_WEBHOOK_SIGNING_SECRET,
+    });
 
     const { id } = evt.data;
     const eventType = evt.type;
