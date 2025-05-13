@@ -1,4 +1,5 @@
 import { verifyWebhook } from '@clerk/nextjs/webhooks';
+import { create } from 'domain';
 
 export async function POST(req) {
   try {
@@ -11,12 +12,31 @@ export async function POST(req) {
 
     console.log('Received webhook:', eventType);
 
-    if (eventType === 'user.created') {
-      console.log('User created:', id);
+    if (eventType === 'user.created' || eventType === 'user.updated') {
+      const {id, first_name, last_name, image_url, email_addresses} = evt.data;
+      try {
+        await createOrUpdate(id, first_name, last_name, image_url, email_addresses);
+        return new Response("user is created", { status: 200 });
+        
+      } catch (error) {
+        console.log("error creating user",error)
+        return new Response("error creating user", { status: 500 });
+        
+      }
     }
 
-    if (eventType === 'user.updated') {
-      console.log('User updated:', id);
+    if (eventType === 'user.deleted') { 
+      const {id} = evt.data;
+      try {
+      await deleteUser(id);
+      return new Response("user is deleted", { status: 200 });
+        
+      } catch (error) {
+        console.log("error deleting user",error)
+        return new Response("error deleting user", { status: 500 });
+        
+      }
+
     }
 
     return new Response('Webhook received', { status: 200 });
