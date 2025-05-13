@@ -1,5 +1,5 @@
 import { verifyWebhook } from '@clerk/nextjs/webhooks';
-import { create } from 'domain';
+
 
 export async function POST(req) {
   try {
@@ -7,13 +7,13 @@ export async function POST(req) {
       secret: process.env.CLERK_WEBHOOK_SIGNING_SECRET,
     });
 
-    const { id } = evt.data;
+    
     const eventType = evt.type;
 
     console.log('Received webhook:', eventType);
 
     if (eventType === 'user.created' || eventType === 'user.updated') {
-      const {id, first_name, last_name, image_url, email_addresses} = evt.data;
+      const {id, first_name, last_name, image_url, email_addresses} = evt?.data;
       try {
         await createOrUpdate(id, first_name, last_name, image_url, email_addresses);
         return new Response("user is created", { status: 200 });
