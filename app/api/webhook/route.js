@@ -1,65 +1,62 @@
-import { verifyWebhook } from '@clerk/nextjs/webhooks';
-// import { createOrUpdate, deleteUser } from '@/lib/actions/user.actions'; // adjust path as needed
-import { createOrUpdate, deleteUser } from '@/lib/actions/user'; // adjust path as needed
+import { createOrUpdateUser, deleteOneUser } from '@/lib/actions/user'
+import { clerkClient } from '@clerk/nextjs/server'
+import { verifyWebhook } from '@clerk/nextjs/webhooks'
 
-export async function POST(req) {
-  console.log("📬 Clerk webhook received");
-
+export async function POST(req
+    
+) {
   try {
-    const evt = await verifyWebhook(req, {
-      secret: process.env.CLERK_WEBHOOK_SIGNING_SECRET,
-    });
+    const evt = await verifyWebhook(req)
+    
+    // Do something with payload
+    // For this guide, log payload to console
+    const { id } = evt?.data
+    const eventType = evt?.type
+    console.log(`Received webhook with ID ${id} and event type of ${eventType}`)
+    console.log('Webhook payload:', evt.data)
+    if(eventType==="user.created" || eventType==="user.updated"){
+     
+        const{id,first_name,last_name,image_url,email_addresses,username}=evt?.data;
+        try {
+          const user=await createOrUpdateUser(id,first_name,last_name,image_url,email_addresses,username)
+          if(user &&evt?.type==="user.created"){
+            try {
+              await clerkClient.users.updateUserMetadeta(id,{
+                publicMetadata:{
+                  userMongoId:user._id,
+                  isAdmin:user.isAdmin,
+                }
+              })
+            } catch (error) {
+              console.log("error updating user metadata",error)
+              
+            }
+          }
+          
+        } catch (error) {
+          console.log("error updating or creating user webhook",error)
+          return new Response('Database error', { status: 500 });
+          
+        }
 
-    const eventType = evt.type;
-    const eventData = evt.data;
 
-    console.log('✅ Verified Clerk webhook:', eventType);
-    console.log('📦 Webhook payload:', eventData);
-
-    if (eventType === 'user.created' || eventType === 'user.updated') {
-      const {
-        id,
-        first_name,
-        last_name,
-        image_url,
-        email_addresses,
-        username
-      } = eventData;
-
-      console.log("👤 Creating or updating user:", {
-        id,
-        first_name,
-        last_name,
-        email: email_addresses?.[0]?.email_address,
-        username,
-      });
-
+     
+    }
+    if(eventType==="user.deleted"){
+      const {id}=evt?.data
       try {
-        await createOrUpdate(id, first_name, last_name, image_url, email_addresses, username);
-        return new Response("✅ User created/updated", { status: 200 });
+        await deleteOneUser(id)
       } catch (error) {
-        console.error("❌ Error creating/updating user:", error);
-        return new Response("❌ Error creating/updating user", { status: 500 });
+        console.log("error deleting user webhook",error)
+        return new Response('Delete error', { status: 500 });
+        
       }
     }
 
-    if (eventType === 'user.deleted') {
-      const { id } = eventData;
-
-      console.log("🗑️ Deleting user:", id);
-
-      try {
-        await deleteUser(id);
-        return new Response("✅ User deleted", { status: 200 });
-      } catch (error) {
-        console.error("❌ Error deleting user:", error);
-        return new Response("❌ Error deleting user", { status: 500 });
-      }
-    }
-
-    return new Response('✅ Webhook received (no matching event type)', { status: 200 });
+    return new Response('Webhook received', { status: 200 })
   } catch (err) {
-    console.error('❌ Webhook verification failed:', err);
-    return new Response('❌ Webhook verification failed', { status: 500 });
+    console.error('Error verifying webhook:', err)
+    return new Response('Invalid signature', { status: 400 });
+
   }
 }
